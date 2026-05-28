@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="description" content="Kişisel Telegram Drive arayüzü. Dosyalarınızı doğrudan Telegram'a yükleyin.">
+  <title>Telegram Drive</title>
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📁</text></svg>">
+
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --bg-card: #1e293b;
+      --bg-hover: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+      margin: 0;
+      padding: 15px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: 20px auto;
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      border: 1px solid var(--bg-hover);
+    }
+
+    .header-text {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .header-text h1 {
+      color: var(--accent);
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .header-text p {
+      color: var(--text-muted);
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .upload-area {
+      border: 2px dashed #475569;
+      padding: 40px 20px;
+      text-align: center;
+      border-radius: 16px;
+      margin: 20px 0;
+      cursor: pointer;
+      background: rgba(15, 23, 42, 0.5);
+      transition: all 0.3s ease;
+    }
+
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--accent);
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .upload-area i {
+      font-size: 48px;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+
+    .upload-area p { margin: 0; font-size: 15px; }
+    .upload-area span { color: var(--accent); font-weight: 600; }
+
+    .file-list {
+      margin-top: 30px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .file-item {
+      background: var(--bg-main);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      border: 1px solid var(--bg-hover);
+      transition: transform 0.2s ease;
+    }
+
+    .file-preview {
+      width: 50px;
+      height: 50px;
+      border-radius: 10px;
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      overflow: hidden;
+      font-size: 24px;
+      color: var(--accent);
+      border: 1px solid #334155;
+    }
+
+    .file-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .file-details {
+      flex-grow: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .file-name {
+      font-size: 15px;
+      font-weight: 500;
+      color: #e2e8f0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .file-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .file-meta.error { color: var(--danger); }
+    .file-meta.success { color: var(--success); }
+
+    .file-actions {
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: none;
+      background: var(--bg-card);
+      color: var(--text-main);
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover { background: var(--bg-hover); }
+    .btn-icon.download:hover { color: var(--accent); }
+    .btn-icon.delete:hover { background: var(--danger); color: white; }
+
+    @media (max-width: 480px) {
+      .container { padding: 15px; border-radius: 16px; margin: 10px auto; }
+      .upload-area { padding: 30px 15px; }
+      .file-item { padding: 10px; gap: 10px; }
+      .file-preview { width: 42px; height: 42px; font-size: 20px; }
+      .file-name { font-size: 14px; }
+      .btn-icon { width: 36px; height: 36px; font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header-text">
+      <h1><i class="ph-fill ph-cloud-arrow-up"></i> Özel Telegram Drive</h1>
+      <p>Dosyalarınız kişisel Telegram hesabınızda güvenle saklanır</p>
+    </div>
+
+    <div class="upload-area" id="dropArea">
+      <i class="ph ph-upload-simple"></i>
+      <p>Dosyaları buraya sürükleyin veya <span>tıklayıp seçin</span></p>
+      <input type="file" id="fileInput" multiple style="display:none">
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+  </div>
+
+  <script>
+    // --- TELEGRAM BİLGİLERİ (Kendi bilgilerini buraya yapıştır) ---
+    const botToken = "YOUR_TELEGRAM_BOT_TOKEN"; 
+    const userChatId = "YOUR_TELEGRAM_CHAT_ID";
+
+    // --- FIREBASE BİLGİLERİ (Kendi bilgilerini buraya yapıştır) ---
+    const firebaseConfig = {
+      apiKey: "YOUR_FIREBASE_API_KEY",
+      authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+      databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    
+    // Firebase Başlatma
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const dropArea = document.getElementById('dropArea');
+    const fileInput = document.getElementById('fileInput');
+
+    document.addEventListener('DOMContentLoaded', listenHistory);
+
+    // Sürükle Bırak İşlemleri
+    dropArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+    dropArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropArea.classList.add('dragover');
+    });
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('dragover'));
+    dropArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropArea.classList.remove('dragover');
+      uploadFiles(e.dataTransfer.files);
+    });
+
+    // Dosya türüne göre modern Phosphor İkonları belirleme
+    function getFileIconHTML(fileName) {
+      if (fileName.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)) return '<i class="ph ph-image"></i>';
+      if (fileName.match(/\.(mp4|mkv|avi|mov)$/i)) return '<i class="ph ph-video-camera"></i>';
+      if (fileName.match(/\.(mp3|wav|ogg)$/i)) return '<i class="ph ph-music-notes"></i>';
+      if (fileName.match(/\.(zip|rar|7z)$/i)) return '<i class="ph ph-archive"></i>';
+      if (fileName.match(/\.(pdf|doc|docx|txt)$/i)) return '<i class="ph ph-file-text"></i>';
+      return '<i class="ph ph-file"></i>';
+    }
+
+    // Tarihi formatlama (Örn: 28 Mayıs 2026, 14:30)
+    function formatDate(timestamp) {
+      if (!timestamp) return 'Yeni yüklendi';
+      const date = new Date(timestamp);
+      return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' }) + ' ' + 
+             date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function uploadFiles(files) {
+      for (let file of files) {
+        let previewHtml = '';
+        
+        // Yeni yüklemelerde resimse gerçek önizleme göster, değilse ikon
+        if (file.type.startsWith('image/')) {
+          const objectUrl = URL.createObjectURL(file);
+          previewHtml = `<img src="${objectUrl}" alt="Önizleme">`;
+        } else {
+          previewHtml = getFileIconHTML(file.name);
+        }
+
+        const tempId = 'temp_' + Date.now();
+        const fileElement = createListItem(file.name, '<i class="ph ph-spinner-gap ph-spin"></i> Yükleniyor...', previewHtml, tempId);
+
+        const formData = new FormData();
+        formData.append('chat_id', userChatId);
+        formData.append('document', file);
+
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+            method: 'POST',
+            body: formData
+          });
+
+          const data = await res.json();
+
+          if (data.ok) {
+            const fileId = data.result.document.file_id;
+            fileElement.remove(); // Geçici elementi kaldır, Firebase'den temiz hali gelecek
+            saveToFirebase(file.name, fileId);
+          } else {
+            updateMetaStatus(fileElement, `Hata: ${data.description}`, 'error');
+          }
+        } catch (err) {
+          updateMetaStatus(fileElement, 'Bağlantı Hatası', 'error');
+        }
+      }
+    }
+
+    function createListItem(name, metaText, previewContent, id, fileId = null, firebaseKey = null) {
+      const list = document.getElementById('fileList');
+      const div = document.createElement('div');
+      div.className = 'file-item';
+      div.setAttribute('data-id', id);
+      
+      const safeName = name.replace(/'/g, "\\'");
+      
+      // Eğer yükleme tamamlandıysa aksiyon butonlarını oluştur
+      let actionButtons = '';
+      if (fileId && firebaseKey) {
+        actionButtons = `
+          <button class="btn-icon download" onclick="getDownloadLink('${fileId}', '${safeName}')" title="İndir / Aç">
+            <i class="ph ph-download-simple"></i>
+          </button>
+          <button class="btn-icon delete" onclick="removeFromFirebase('${firebaseKey}')" title="Listeden Sil">
+            <i class="ph ph-trash"></i>
+          </button>
+        `;
+      }
+
+      div.innerHTML = `
+        <div class="file-preview">${previewContent}</div>
+        <div class="file-details">
+          <div class="file-name" title="${name}">${name}</div>
+          <div class="file-meta">${metaText}</div>
+        </div>
+        <div class="file-actions">${actionButtons}</div>
+      `;
+      
+      // En tepeye ekle
+      if (list.firstChild) {
+        list.insertBefore(div, list.firstChild);
+      } else {
+        list.appendChild(div);
+      }
+      return div;
+    }
+
+    function updateMetaStatus(element, text, statusClass) {
+      const meta = element.querySelector('.file-meta');
+      meta.innerHTML = text;
+      meta.className = `file-meta ${statusClass}`;
+    }
+
+    function saveToFirebase(name, fileId) {
+      db.ref('drive_history').push({
+        name: name,
+        fileId: fileId,
+        timestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+    }
+
+    function listenHistory() {
+      db.ref('drive_history').orderByChild('timestamp').on('value', (snapshot) => {
+        const list = document.getElementById('fileList');
+        
+        // Yüklenmekte olan geçici elementlere dokunma, hazır olanları temizle
+        const readyItems = list.querySelectorAll(".file-item:not([data-id^='temp_'])");
+        readyItems.forEach(item => item.remove());
+
+        let files = [];
+        snapshot.forEach((childSnapshot) => {
+          files.push({
+            key: childSnapshot.key,
+            data: childSnapshot.val()
+          });
+        });
+
+        // En son eklenen en üstte olacak şekilde tersine çevirip ekrana bas
+        files.reverse().forEach(fileItem => {
+          const file = fileItem.data;
+          const iconHTML = getFileIconHTML(file.name);
+          const timeStr = formatDate(file.timestamp);
+          
+          createListItem(file.name, timeStr, iconHTML, fileItem.key, file.fileId, fileItem.key);
+        });
+      });
+    }
+
+    function removeFromFirebase(firebaseKey) {
+      const confirmDelete = confirm("Bu dosya listeden kaldırılacak. (Telegram'dan silinmez). Emin misiniz?");
+      if (confirmDelete) {
+        db.ref('drive_history/' + firebaseKey).remove()
+          .catch(err => alert("Silme işlemi başarısız: " + err.message));
+      }
+    }
+
+    async function getDownloadLink(fileId, name) {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+        const data = await res.json();
+
+        if (data.ok) {
+          const fileUrl = `https://api.telegram.org/file/bot${botToken}/${data.result.file_path}`;
+          window.open(fileUrl, '_blank');
+        } else {
+          alert('Dosya bulunamadı: ' + data.description);
+        }
+      } catch (err) {
+        alert('İndirme bağlantısı alınırken hata oluştu.');
+      }
+    }
+  </script>
+</body>
+</html>
